@@ -1,0 +1,13 @@
+{
+  "name": "allra-common-skills",
+  "version": "1.0.0",
+  "description": "Allra 전체 팀 공통 Skills - 코드 리뷰, 커밋 가이드",
+  "author": {
+    "name": "Allra Engineering Team",
+    "email": "eng@allra.com"
+  },
+  "homepage": "https://github.com/Allra-Fintech/allra-ai-skills",
+  "repository": "https://github.com/Allra-Fintech/allra-ai-skills",
+  "license": "MIT",
+  "keywords": ["code-review", "common", "best-practices"]
+}

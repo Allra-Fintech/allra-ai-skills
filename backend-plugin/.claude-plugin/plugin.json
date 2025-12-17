@@ -1,0 +1,13 @@
+{
+  "name": "allra-backend-skills",
+  "version": "1.0.0",
+  "description": "Allra 백엔드 팀 전용 Skills - API 설계, 에러 핸들링, 데이터베이스 스키마",
+  "author": {
+    "name": "Allra Backend Team",
+    "email": "backend@allra.com"
+  },
+  "homepage": "https://github.com/Allra-Fintech/allra-ai-skills",
+  "repository": "https://github.com/Allra-Fintech/allra-ai-skills",
+  "license": "MIT",
+  "keywords": ["backend", "api-design", "database", "error-handling"]
+}
