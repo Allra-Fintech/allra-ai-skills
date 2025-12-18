@@ -9,24 +9,29 @@ Allra 백엔드 팀의 API 설계, DTO 네이밍, 패키지 구조 표준을 정
 
 ## 프로젝트 기본 정보
 
-- **패키지**: kr.co.allra.*
-- **Java 버전**: 17
-- **Spring Boot 버전**: 3.2.4
-- **주요 기술**: JPA/Hibernate, QueryDSL 5.0.0, JWT
+이 가이드는 다음 환경을 기준으로 작성되었습니다:
+
+- **Java**: 17 이상
+- **Spring Boot**: 3.2 이상
+- **주요 기술**: JPA/Hibernate, QueryDSL, JWT
+
+**참고**: 프로젝트별로 사용하는 기술 스택이나 버전이 다를 수 있습니다. 프로젝트에 맞게 조정하여 사용하세요.
 
 ## 패키지 구조 규칙
 
-반드시 도메인별 패키지 구조를 따릅니다:
+도메인별 패키지 구조를 권장합니다:
 
 ```text
 └── {domain}
     ├── api          // 컨트롤러 레이어
     ├── dto          // 데이터 전송 객체
     ├── entity       // JPA 엔티티
-    ├── enums        // Enum 정의
+    ├── enums        // Enum 정의 (선택)
     ├── repository   // 데이터 접근 계층
     └── service      // 비즈니스 로직
 ```
+
+**참고**: 프로젝트에 따라 `controller`, `model`, `dao` 등 다른 이름을 사용할 수 있습니다. 중요한 것은 레이어별 책임을 명확히 분리하는 것입니다.
 
 ### 예시
 
@@ -131,6 +136,8 @@ public class UserController {
 }
 ```
 
+**참고**: API 버저닝(`/api/v1/...`)은 프로젝트 정책에 따라 선택적으로 적용합니다.
+
 ### 2. Request Validation
 
 모든 Request DTO는 Bean Validation 사용:
@@ -150,10 +157,12 @@ public record SignUpRequest(
 ) {}
 ```
 
-### 3. 응답 형식 표준화
+### 3. 응답 형식
+
+**Allra 표준 형식 (예시):**
 
 성공 응답:
-```java
+```json
 {
   "data": { ... },
   "message": "요청이 성공적으로 처리되었습니다"
@@ -161,7 +170,7 @@ public record SignUpRequest(
 ```
 
 에러 응답:
-```java
+```json
 {
   "error": {
     "code": "USER_NOT_FOUND",
@@ -170,6 +179,8 @@ public record SignUpRequest(
   }
 }
 ```
+
+**참고**: 응답 형식은 프로젝트별로 다를 수 있습니다. 일관성 있는 형식을 유지하는 것이 중요합니다.
 
 ## When to Use This Skill
 
@@ -254,5 +265,4 @@ public record ProductCreatedEventDto(
 - [ ] DTO가 record로 작성되었는가?
 - [ ] Request DTO에 Validation이 적용되었는가?
 - [ ] REST API 명명 규칙을 따르는가?
-- [ ] API 버저닝이 적용되었는가? (/api/v1/...)
 - [ ] 내부 사용 DTO에 `Dto` 접미사가 있는가?
