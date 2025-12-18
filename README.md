@@ -37,55 +37,36 @@ Allra 팀의 AI 코딩 도구용 Skills 모음입니다. 팀별로 구분된 Plu
 
 프론트엔드 팀용 Skills (향후 추가 예정)
 
-## 🚀 설치 방법
+## 🚀 설치 방법 (Personal Skills)
 
-### Claude Code 사용자
-
-#### 방법 1: Plugin으로 설치 (권장)
+### 1. 처음 설치 (1회만)
 
 ```bash
-# 1. Marketplace 추가
-/plugin marketplace add Allra-Fintech/allra-ai-skills
+# allra-ai-skills clone
+cd ~
+git clone https://github.com/Allra-Fintech/allra-ai-skills.git
 
-# 2. Backend Plugin 설치
-/plugin install allra-backend-skills@allra-ai-skills
+# Personal Skills로 복사 (모든 프로젝트에서 사용 가능)
+mkdir -p ~/.claude/skills
+cp -r ~/allra-ai-skills/backend-plugin/skills/* ~/.claude/skills/
 ```
 
-#### 방법 2: 프로젝트 설정에 자동 포함
-
-`.claude/settings.json` 파일에 추가:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "allra-ai-skills": {
-      "source": {
-        "source": "github",
-        "repo": "Allra-Fintech/allra-ai-skills"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "allra-backend-skills@allra-ai-skills": true
-  }
-}
-```
-
-### 다른 AI 도구 사용자
-
-각 Skill의 `SKILL.md` 파일을 참고하여 프롬프트나 설정에 활용하세요:
+### 2. 설치 확인
 
 ```bash
-# Skill 문서 확인
-cat backend-plugin/skills/api-design/SKILL.md
-cat backend-plugin/skills/database-schema/SKILL.md
-cat backend-plugin/skills/error-handling/SKILL.md
+ls ~/.claude/skills/
+# api-design  database-schema  error-handling
 ```
 
-**사용 예시:**
-- **GitHub Copilot**: Skill 내용을 프로젝트 README에 포함
-- **Cursor AI**: `.cursorrules` 파일에 Skill 내용 추가
-- **기타 도구**: 컨텍스트로 Skill 문서 제공
+### 3. Skills 업데이트
+
+```bash
+cd ~/allra-ai-skills
+git pull
+cp -r backend-plugin/skills/* ~/.claude/skills/
+```
+
+**끝!** 이제 모든 프로젝트에서 자동으로 Allra 표준이 적용됩니다.
 
 ## 📂 디렉토리 구조
 
