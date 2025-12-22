@@ -12,25 +12,51 @@ Allra 팀의 AI 코딩 도구용 Skills 모음입니다. 코딩 표준과 Best P
 
 ## 🚀 설치 방법 (Personal Skills)
 
-### 1. 처음 설치 (1회만)
+### 방법 1: Claude Code 사용 (권장)
+
+Claude Code를 사용하는 경우 `/plugin` 명령어로 간편하게 설치할 수 있습니다:
 
 ```bash
-# allra-ai-skills clone
+# 1. 저장소 clone
 cd ~
 git clone https://github.com/Allra-Fintech/allra-ai-skills.git
 
-# Personal Skills로 복사 (모든 프로젝트에서 사용 가능)
+# 2. Claude Code에서 플러그인 등록
+/plugin install ~/allra-ai-skills/backend-plugin
+/plugin install ~/allra-ai-skills/common-plugin
+/plugin install ~/allra-ai-skills/frontend-plugin
+```
+
+> **💡 Tip:** 플러그인 설치 시 **로컬에 저장(Save to Local)**을 선택하면 로컬에서 작업하는 모든 프로젝트에 적용할 수 있습니다.
+
+설치 후 `/skills` 명령어로 확인할 수 있습니다.
+
+#### Skills 업데이트
+
+**자동 업데이트 (권장):**
+1. `/plugin` 명령어 실행
+2. **Marketplace** 탭 선택
+3. 설치된 플러그인에서 **Enable auto-update** 설정
+
+### 방법 2: 수동 설치
+
+```bash
+# 1. allra-ai-skills clone
+cd ~
+git clone https://github.com/Allra-Fintech/allra-ai-skills.git
+
+# 2. Personal Skills로 복사 (모든 프로젝트에서 사용 가능)
 mkdir -p ~/.claude/skills
 cp -r ~/allra-ai-skills/*/skills/* ~/.claude/skills/
 ```
 
-### 2. 설치 확인
+#### 설치 확인
 
 ```bash
 ls ~/.claude/skills/
 ```
 
-### 3. Skills 업데이트
+#### Skills 업데이트
 
 ```bash
 cd ~/allra-ai-skills
