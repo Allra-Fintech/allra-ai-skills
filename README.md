@@ -16,14 +16,16 @@ Allra 팀의 AI 코딩 도구용 Skills 모음입니다. 코딩 표준과 Best P
 
 Claude Code를 사용하는 경우 `/plugin` 명령어로 간편하게 설치할 수 있습니다.
 
-#### 옵션 A: Git 저장소 URL 사용 (가장 간편)
+#### 옵션 A: Marketplace에서 Git 저장소로 설치 (가장 간편)
 
-```bash
-# Claude Code에서 Git 저장소 직접 설치
-/plugin install https://github.com/Allra-Fintech/allra-ai-skills.git
-```
-
-플러그인을 선택하여 설치하고, **로컬에 저장(Save to Local)**을 선택하면 모든 프로젝트에 적용됩니다.
+1. Claude Code에서 `/plugin` 명령어 입력
+2. **Marketplace** 탭 선택
+3. **Install from Git** 버튼 클릭 또는 Git URL 입력란에 저장소 주소 입력:
+   ```
+   https://github.com/Allra-Fintech/allra-ai-skills.git
+   ```
+4. 원하는 플러그인 선택 (backend-plugin, common-plugin, frontend-plugin)
+5. **로컬에 저장(Save to Local)** 선택 → 모든 프로젝트에 적용됩니다
 
 #### 옵션 B: 로컬 경로 사용
 
