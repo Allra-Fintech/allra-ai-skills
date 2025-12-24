@@ -47,6 +47,333 @@ Service 로직 (Mock)? → MockingUnitTest
 
 ---
 
+## 🎯 Mock vs Integration 선택 기준 (중요!)
+
+**원칙**: 기본은 MockingUnitTest, 꼭 필요할 때만 IntegrationTest
+
+**목표**: IntegrationTest 비율 5% 이하 유지
+
+### 의사결정 플로우차트
+
+```
+┌─────────────────────────────────┐
+│ 무엇을 테스트하려고 하는가?    │
+└────────────┬────────────────────┘
+             │
+    ┌────────▼────────┐
+    │ 도메인 로직만?  │ ──Yes──> PojoUnitTest
+    └────────┬────────┘
+             │ No
+    ┌────────▼─────────────────────┐
+    │ Repository/QueryDSL 쿼리?   │ ──Yes──> RdbTest
+    └────────┬─────────────────────┘
+             │ No
+    ┌────────▼─────────────────────┐
+    │ API 엔드포인트 응답/검증?   │ ──Yes──> ControllerTest
+    └────────┬─────────────────────┘
+             │ No
+    ┌────────▼─────────────────────────────┐
+    │ Service 비즈니스 로직 검증?         │
+    └────────┬─────────────────────────────┘
+             │
+    ┌────────▼──────────────────────────────────────────┐
+    │ 다음 중 하나라도 해당하는가?                      │
+    │                                                   │
+    │ 1. 💰 금전 처리 (입금/출금/이체/환불)            │
+    │ 2. 🔄 트랜잭션 롤백이 중요한 워크플로우           │
+    │ 3. 📊 여러 테이블 데이터 정합성 검증             │
+    │ 4. 🔐 실제 DB 제약조건 검증 필수                 │
+    │ 5. 📝 복잡한 상태 전이 (3단계 이상)              │
+    │ 6. 🎯 이벤트 발행/리스너 통합 검증               │
+    │ 7. 🤝 3개 이상 서비스 필수 협력                  │
+    └────┬──────────────────────────────────────┬────────┘
+         │ Yes                                  │ No
+         │                                      │
+    ┌────▼────────────┐              ┌─────────▼──────────┐
+    │ IntegrationTest │              │ MockingUnitTest    │
+    │ (최소화)        │              │ (기본 선택)       │
+    └─────────────────┘              └────────────────────┘
+```
+
+### IntegrationTest가 필요한 구체적인 케이스
+
+#### ✅ 1. 금전 처리 (입금/출금/이체/환불)
+
+**이유**: 돈이 관련된 로직은 실제 DB 트랜잭션 동작 검증 필수
+
+```java
+// 예시: 펀딩 신청 (FsData → FsPayment → PointUsage → UserAccount 연계)
+@DisplayName("펀딩 신청 시 금액 차감 및 결제 생성")
+class ApplyServiceIntegrationTest extends IntegrationTest {
+
+    @Test
+    @Transactional
+    void apply_DecreasesAmount_Success() {
+        // given: 사용자 잔액 100만원
+        User user = createUserWithBalance(1_000_000);
+
+        // when: 50만원 펀딩 신청
+        applyService.apply(new ApplyRequest(user.getId(), 500_000));
+
+        // then: 실제 DB에서 잔액 50만원 확인
+        User updated = userRepository.findById(user.getId()).get();
+        assertThat(updated.getBalance()).isEqualTo(500_000);
+
+        // then: FsPayment 생성 확인
+        FsPayment payment = fsPaymentRepository.findByUserId(user.getId()).get();
+        assertThat(payment.getAmount()).isEqualTo(500_000);
+    }
+}
+```
+
+#### ✅ 2. 트랜잭션 롤백이 중요한 워크플로우
+
+**이유**: 실패 시 모든 작업이 원자적으로 롤백되어야 함
+
+```java
+// 예시: 결제 실패 시 전체 롤백
+@Test
+@DisplayName("결제 실패 시 신청 데이터도 롤백")
+void apply_PaymentFails_RollbackAll() {
+    // given
+    User user = createUser();
+    mockPaymentGateway_ToFail(); // 외부 결제는 Mock으로
+
+    // when & then
+    assertThatThrownBy(() -> applyService.apply(request))
+        .isInstanceOf(PaymentException.class);
+
+    // then: DB에 어떤 데이터도 저장되지 않음
+    assertThat(fsDataRepository.findAll()).isEmpty();
+    assertThat(fsPaymentRepository.findAll()).isEmpty();
+}
+```
+
+**참고**: 외부 연동(결제 게이트웨이, 외부 API)은 `@MockBean`으로 처리
+
+#### ✅ 3. 여러 테이블 데이터 정합성 검증
+
+**이유**: 관련된 모든 테이블의 상태가 일관되게 유지되는지 확인
+
+```java
+// 예시: 계약 생성 시 UserAccount, Contract, FsData 모두 생성
+@Test
+@DisplayName("신규 계약 시 관련 테이블 모두 생성")
+void createContract_CreatesAllRelatedData() {
+    // when
+    contractService.createContract(userId, contractType);
+
+    // then: 3개 테이블 모두 데이터 존재
+    assertThat(userAccountRepository.findByUserId(userId)).isPresent();
+    assertThat(contractRepository.findByUserId(userId)).isPresent();
+    assertThat(fsDataRepository.findByUserId(userId)).isPresent();
+}
+```
+
+#### ✅ 4. 실제 DB 제약조건 검증
+
+**이유**: Unique, FK, Check 제약조건은 실제 DB에서만 확인 가능
+
+```java
+// 예시: 중복 계좌 등록 방지
+@Test
+@DisplayName("동일 계좌번호 중복 등록 시 예외")
+void registerAccount_Duplicate_ThrowsException() {
+    // given
+    userAccountRepository.save(new UserAccount(userId, "123-456-789"));
+
+    // when & then: Unique 제약조건 위반
+    assertThatThrownBy(() ->
+        userAccountRepository.save(new UserAccount(userId, "123-456-789"))
+    ).isInstanceOf(DataIntegrityViolationException.class);
+}
+```
+
+#### ✅ 5. 복잡한 상태 전이 (3단계 이상)
+
+**이유**: 상태 변화 흐름을 실제 시나리오대로 검증
+
+```java
+// 예시: 계약 상태 전이 (신청 → 심사 → 승인 → 완료)
+@Test
+@DisplayName("계약 워크플로우 전체 검증")
+void contractWorkflow_FullCycle() {
+    // given: 신청
+    Contract contract = contractService.create(userId);
+    assertThat(contract.getStatus()).isEqualTo(ContractStatus.PENDING);
+
+    // when: 심사
+    contractService.review(contract.getId());
+    // then
+    Contract reviewed = contractRepository.findById(contract.getId()).get();
+    assertThat(reviewed.getStatus()).isEqualTo(ContractStatus.REVIEWED);
+
+    // when: 승인
+    contractService.approve(contract.getId());
+    // then
+    Contract approved = contractRepository.findById(contract.getId()).get();
+    assertThat(approved.getStatus()).isEqualTo(ContractStatus.APPROVED);
+}
+```
+
+#### ✅ 6. 이벤트 발행/리스너 통합 검증
+
+**이유**: 이벤트가 실제로 발행되고 리스너가 동작하는지 확인
+
+```java
+// 예시: 계약 완료 이벤트 → 알림 발송
+@Test
+@DisplayName("계약 완료 시 알림 이벤트 발행")
+void completeContract_PublishesEvent() {
+    // given
+    Contract contract = createContract(userId);
+
+    // when
+    contractService.complete(contract.getId());
+
+    // then: 실제로 알림이 발송되었는가? (외부 알림은 @MockBean)
+    verify(notificationService).sendContractCompleteNotification(userId);
+}
+```
+
+#### ✅ 7. 3개 이상 서비스가 필수적으로 협력
+
+**이유**: 서비스 간 상호작용을 실제 환경에서 검증
+
+```java
+// 예시: 주문 생성 → 재고 차감 → 결제 → 알림
+@Test
+@DisplayName("주문 생성 워크플로우")
+void createOrder_FullWorkflow() {
+    // given
+    Product product = createProductWithStock(100);
+
+    // when
+    orderService.createOrder(userId, product.getId(), 10);
+
+    // then: 재고 차감
+    Product updated = productRepository.findById(product.getId()).get();
+    assertThat(updated.getStock()).isEqualTo(90);
+
+    // then: 결제 생성
+    Payment payment = paymentRepository.findByUserId(userId).get();
+    assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+}
+```
+
+### MockingUnitTest로 충분한 케이스
+
+#### ✅ 대부분의 Service 로직
+
+- 단순 조회 (findById, findAll)
+- 데이터 변환/계산
+- 검증 로직 (validation)
+- 단일 엔티티 CRUD
+- 비즈니스 규칙 검증
+
+```java
+// 예시: 할인율 계산 로직 (Mock으로 충분)
+@ExtendWith(MockitoExtension.class)
+class DiscountServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private DiscountService discountService;
+
+    @Test
+    @DisplayName("VIP 회원 10% 할인 계산")
+    void calculateDiscount_VipUser_10Percent() {
+        // given
+        User vipUser = User.builder().grade("VIP").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(vipUser));
+
+        // when
+        BigDecimal discount = discountService.calculateDiscount(1L, new BigDecimal("10000"));
+
+        // then
+        assertThat(discount).isEqualByComparingTo(new BigDecimal("1000"));
+    }
+}
+```
+
+### 외부 연동 처리 원칙
+
+**중요**: IntegrationTest에서도 외부 시스템은 `@MockBean`으로 처리
+
+```java
+@SpringBootTest
+class PaymentServiceIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    private PaymentService paymentService;
+
+    @MockBean // 외부 결제 게이트웨이는 Mock
+    private ExternalPaymentGateway externalPaymentGateway;
+
+    @MockBean // 외부 알림 서비스는 Mock
+    private ExternalNotificationService notificationService;
+
+    @Test
+    @DisplayName("결제 성공 시 내부 데이터 정합성 검증")
+    void processPayment_Success() {
+        // given: 외부 결제는 성공으로 Mock
+        when(externalPaymentGateway.charge(any()))
+            .thenReturn(new PaymentResult("SUCCESS", "tx-123"));
+
+        // when: 실제 내부 로직 검증
+        paymentService.processPayment(userId, amount);
+
+        // then: 내부 DB 상태 확인
+        Payment payment = paymentRepository.findByUserId(userId).get();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(payment.getExternalTxId()).isEqualTo("tx-123");
+    }
+}
+```
+
+### 테스트 전략 요약
+
+| 테스트 유형 | 목표 비율 | 실행 속도 | 주요 사용처 |
+|------------|----------|----------|------------|
+| **PojoUnitTest** | 30% | ⚡️ 0.01초 | 도메인 로직, 유틸리티 |
+| **MockingUnitTest** | 50% | ⚡️ 0.1초 | Service 비즈니스 로직 |
+| **ControllerTest** | 10% | 🟡 0.5초 | API 검증 |
+| **RdbTest** | 5% | 🟡 1초 | 복잡한 쿼리 검증 |
+| **IntegrationTest** | 5% | 🔴 5초 | 금전/트랜잭션/워크플로우 |
+
+### 빠른 판단 체크리스트
+
+새로운 테스트를 작성할 때 다음을 확인하세요:
+
+```
+□ 돈이 관련되어 있나요? (입금/출금/결제)
+  → Yes: IntegrationTest
+
+□ 실패 시 데이터 롤백이 중요한가요?
+  → Yes: IntegrationTest
+
+□ 3개 이상 테이블의 정합성을 확인해야 하나요?
+  → Yes: IntegrationTest
+
+□ DB 제약조건(Unique/FK)이 핵심인가요?
+  → Yes: IntegrationTest
+
+□ 복잡한 상태 전이(3단계+)를 검증하나요?
+  → Yes: IntegrationTest
+
+□ 이벤트 발행/리스너를 검증하나요?
+  → Yes: IntegrationTest
+
+□ 3개 이상 서비스가 협력하나요?
+  → Yes: IntegrationTest
+
+모두 No → MockingUnitTest 사용
+```
+
+---
+
 ## 테스트 헬퍼 구조
 
 ### IntegrationTest - 통합 테스트
@@ -373,11 +700,13 @@ class UserRepositoryTest extends RdbTest {
 이 skill은 다음 상황에서 자동으로 적용됩니다:
 
 - 테스트 파일 생성 또는 수정
-- 테스트 헬퍼 선택 (IntegrationTest, RdbTest, ControllerTest 등)
+- **테스트 헬퍼 선택 (IntegrationTest vs MockingUnitTest 판단)**
 - 테스트 데이터 생성 (Fixture Monkey 사용)
 - Given-When-Then 패턴 적용
 - AssertJ 검증 코드 작성
 - Mockito Mock 설정 및 검증
+
+**특히 중요**: 새로운 Service 테스트 작성 시 먼저 "Mock vs Integration 선택 기준"을 확인하세요!
 
 ---
 
@@ -391,9 +720,17 @@ class UserRepositoryTest extends RdbTest {
 - [ ] AssertJ로 검증하는가?
 - [ ] 메서드명이 `메서드_시나리오_결과` 패턴인가?
 
+**테스트 헬퍼 선택 (가장 먼저 확인!)**
+- [ ] 금전 처리(입금/출금/결제) 또는 트랜잭션 롤백 검증이 필요한가? → IntegrationTest
+- [ ] 3개 이상 테이블 정합성 또는 DB 제약조건 검증이 필요한가? → IntegrationTest
+- [ ] 복잡한 상태 전이(3단계+) 또는 이벤트 발행/리스너 검증이 필요한가? → IntegrationTest
+- [ ] 3개 이상 서비스가 협력하는가? → IntegrationTest
+- [ ] 위 조건 모두 해당 안됨 → MockingUnitTest 사용
+
 **IntegrationTest**
-- [ ] 여러 서비스 협력이 필요한 경우만 사용하는가?
+- [ ] 위 선택 기준 중 하나 이상에 해당하는가?
 - [ ] 외부 API는 @MockBean으로 처리했는가?
+- [ ] 정말 IntegrationTest가 필요한지 다시 한번 검토했는가?
 
 **RdbTest**
 - [ ] Repository/QueryDSL 테스트만 포함하는가?
