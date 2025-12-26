@@ -9,5 +9,6 @@
   "homepage": "https://github.com/Allra-Fintech/allra-ai-skills",
   "repository": "https://github.com/Allra-Fintech/allra-ai-skills",
   "license": "MIT",
-  "keywords": ["backend", "api-design", "database", "error-handling"]
+  "keywords": ["backend", "api-design", "database", "error-handling"],
+  "hooks": "../hooks/hooks.json"
 }
