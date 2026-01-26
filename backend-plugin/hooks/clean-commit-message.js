@@ -1,5 +1,4 @@
 const fs = require('fs');
-const { execSync } = require('child_process');
 
 console.error('🔧 커밋 메시지 클리너 실행됨');
 
@@ -13,21 +12,20 @@ try {
         process.exit(0);
     }
 
-    // 마지막 커밋 메시지에서 Claude 관련 내용 제거
-    const msg = execSync('git log -1 --format=%B', { encoding: 'utf8' });
-
-    const cleaned = msg
-        .replace(/\n*Co-Authored-By:.*Claude.*$/gim, '')
-        .replace(/\n*Co-Authored-By:.*anthropic.*$/gim, '')
-        .replace(/\n*🤖.*Claude.*$/gim, '')
+    // Co-Authored-By 패턴 제거
+    let cleaned = command
+        .replace(/Co-Authored-By:.*[Cc]laude[^\n]*/g, '')
+        .replace(/Co-Authored-By:.*anthropic[^\n]*/g, '')
+        .replace(/🤖.*[Cc]laude[^\n]*/g, '')
         .replace(/\n{3,}/g, '\n\n')
-        .trim();
+        .replace(/\n+EOF/g, '\nEOF')
+        .replace(/"\s*\n+\s*"/g, '"');
 
-    if (msg.trim() !== cleaned) {
-        // 쌍따옴표 이스케이프 처리
-        const escapedMsg = cleaned.replace(/"/g, '\\"');
-        execSync(`git commit --amend -m "${escapedMsg}"`, { stdio: 'pipe' });
-        console.error('✅ Claude 서명 제거됨');
+    if (command !== cleaned) {
+        console.error('✅ Claude 서명이 커밋 메시지에서 제거됨');
+        // 수정된 입력 반환 (PreToolUse에서 tool_input 수정)
+        const result = JSON.stringify({ command: cleaned });
+        console.log(result);
     } else {
         console.error('ℹ️ 제거할 Claude 서명 없음');
     }
@@ -36,5 +34,5 @@ try {
 
 } catch (error) {
     console.error(`⚠️ 클리너 오류 (무시됨): ${error.message}`);
-    process.exit(0); // 오류 시에도 작업 진행
+    process.exit(0);
 }
