@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/clean-commit-message.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
     ]
   }
 }
