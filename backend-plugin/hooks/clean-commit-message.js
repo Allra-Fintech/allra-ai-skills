@@ -23,9 +23,12 @@ try {
 
     if (command !== cleaned) {
         console.error('✅ Claude 서명이 커밋 메시지에서 제거됨');
-        // 수정된 입력 반환 (PreToolUse에서 tool_input 수정)
-        const result = JSON.stringify({ command: cleaned });
-        console.log(result);
+        // PreToolUse 훅에서 tool_input 수정하려면 전체 구조 반환
+        const result = {
+            decision: "modify",
+            tool_input: { command: cleaned }
+        };
+        console.log(JSON.stringify(result));
     } else {
         console.error('ℹ️ 제거할 Claude 서명 없음');
     }
