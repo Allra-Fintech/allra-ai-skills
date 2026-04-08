@@ -56,7 +56,7 @@ function provideProjectSpecificAdvice(entityName, fileType) {
     console.error(`   📝 로깅: ${project.logger} 패턴 유지`);
 
     if (project.hasJpa) {
-        console.error(`   💾 DB: Spring Data JPA 사용`);a
+        console.error(`   💾 DB: Spring Data JPA 사용`);
     }
 
     if (project.hasRedis) {
